@@ -5,12 +5,16 @@ using UnityEngine.Experimental.Rendering.HDPipeline;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMovement : MonoBehaviour
 {
-    public Transform cameraTransform;
+    [Header("Main Camera")] public Transform cameraTransform;
 
     [Header("Movement Settings")] public float moveSpeed;
-    public float maxTurnTime;
+    public float changeDirectionTime;
+    public float rotationSpeed;
     public AnimationCurve turnTimeCurve;
-    public float jumpPower;
+
+    [Header("Jumping Settings")] public float jumpHeight;
+    public int numberOfJumps;
+    private int jumpsUsed;
 
 
     [Header("Gravity Settings")] public float gravity;
@@ -21,7 +25,6 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 velocity = Vector3.zero;
 
 
-    // Start is called before the first frame update
     void Start()
     {
         characterController = GetComponent<CharacterController>();
@@ -56,7 +59,7 @@ public class PlayerMovement : MonoBehaviour
     {
         float dot = (Vector3.Dot(current, target) + 1) / 2;
         float coef = turnTimeCurve.Evaluate(dot);
-        return coef * maxTurnTime;
+        return coef * changeDirectionTime;
     }
 
     void UpdateHorizontalDirection()
@@ -73,18 +76,32 @@ public class PlayerMovement : MonoBehaviour
 
     void UpdateVerticalDirection()
     {
-        // Jumping
+        // Apply Gravity
+        direction.y -= gravity * Time.deltaTime;
+
+        // Jumping logic
         if (characterController.isGrounded)
         {
             direction.y = -0.1f;
-            if (Input.GetKeyDown(KeyCode.Space))
-                direction.y = jumpPower;
+            jumpsUsed = 0;
         }
-        else
+
+        if (Input.GetKeyDown(KeyCode.Space) && jumpsUsed < numberOfJumps)
         {
-            // Gravity
-            direction.y -= gravity * Time.deltaTime;
+            direction.y = Mathf.Sqrt(2 * gravity * jumpHeight);
+            jumpsUsed += 1;
         }
+    }
+
+    void LookForward()
+    {
+        Vector3 horizontalDirection = ProjectOnXZPlane(direction);
+
+        if (horizontalDirection.magnitude <= 0.1f)
+            return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(horizontalDirection);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * rotationSpeed);
     }
 
     // Update is called once per frame
@@ -92,6 +109,7 @@ public class PlayerMovement : MonoBehaviour
     {
         UpdateHorizontalDirection();
         UpdateVerticalDirection();
+        LookForward();
         characterController.Move(direction * Time.deltaTime);
     }
 
